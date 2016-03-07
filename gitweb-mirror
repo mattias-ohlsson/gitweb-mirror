@@ -1,0 +1,78 @@
+#!/bin/bash
+# gitweb-mirror - Create a local copy of gitweb
+
+git_path=/var/lib/git
+
+command -v git >/dev/null || { echo "git: command not found"; \
+ exit 1;}
+command -v curl >/dev/null || { echo "curl: command not found"; \
+ exit 1;}
+
+# Parse options
+TEMP=`getopt -o h -l help,update-only -n 'gitweb-mirror' -- "$@"`
+if [ $? != 0 ] ; then echo "Terminating..." >&2 ; exit 1 ; fi
+eval set -- "$TEMP"
+
+while true; do
+	case "$1" in
+		-h|--help)
+			cat <<- EOF
+				Usage: gitweb-mirror [OPTIONS] GITWEB-URL [TARGET-PATH]
+
+				Options:
+				--update-only Update only
+				-h, --help    show this help message and exit
+			EOF
+			shift
+			exit ;;
+		--update-only)
+			update_only=true ; shift ;;
+		--version)
+			echo $VERSION ; shift ; exit ;;
+		--) shift ; break ;;
+		*) echo "Internal error!" ; exit 1 ;;
+	esac
+done
+
+if [ -z "$1" ]; then
+	echo "Usage: gitweb-mirror [OPTIONS] GITWEB-URL [TARGET-PATH]"
+	exit
+fi
+
+if [ -n "$2" ]; then
+	git_path=$2
+fi
+
+gitweb_url=$1
+
+echo "Gitweb URL     : $gitweb_url"
+echo "Local GIT path : $git_path"
+
+for gitweb_p_html_url in $(curl -s "$gitweb_url/?a=opml" | grep '^<outline type="rss" text="' | cut -d'"' -f10); do
+
+	gitweb_p=$(echo $gitweb_p_html_url | cut -d'=' -f2 | cut -d';' -f1)
+        target_dir=$git_path/$gitweb_p
+
+	if [ ! -d $target_dir ]; then
+
+		if [ "$update_only" = true ]; then
+			continue
+		fi
+
+		mkdir -p $target_dir || continue
+		git --git-dir=$target_dir init --bare
+	fi
+
+	gitweb_p_summary_html=$(curl -s "$gitweb_p_html_url")
+
+	gitweb_p_desc=$(echo "$gitweb_p_summary_html" | \
+	 grep '^<tr id="metadata_desc"><td>description</td><td>' | \
+	 cut -d'>' -f5 | cut -d'<' -f1)
+
+	gitweb_p_url=$(echo "$gitweb_p_summary_html" | \
+	 grep '^<tr class="metadata_url"><td>URL</td><td>' | \
+	 cut -d'>' -f5 | cut -d'<' -f1)
+
+	git --git-dir=$target_dir fetch $gitweb_p_url +refs/heads/*:refs/heads/* --prune
+	echo $gitweb_p_desc > description
+done
