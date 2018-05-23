@@ -86,7 +86,7 @@ for gitweb_p_html_url in $(curl -s "$gitweb_url/?a=opml" | grep '^<outline type=
 	done
 
 	git --git-dir=$target_dir fetch $gitweb_p_url +refs/heads/*:refs/heads/* --prune &
-	echo $gitweb_p_desc > description
+	echo $gitweb_p_desc > $target_dir/description
 done
 
 wait
