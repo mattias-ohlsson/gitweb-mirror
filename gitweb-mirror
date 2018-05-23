@@ -9,7 +9,7 @@ command -v curl >/dev/null || { echo "curl: command not found"; \
  exit 1;}
 
 # Parse options
-TEMP=`getopt -o h -l help,update-only -n 'gitweb-mirror' -- "$@"`
+TEMP=`getopt -o h -l help,update-only,jobs: -n 'gitweb-mirror' -- "$@"`
 if [ $? != 0 ] ; then echo "Terminating..." >&2 ; exit 1 ; fi
 eval set -- "$TEMP"
 
@@ -21,12 +21,15 @@ while true; do
 
 				Options:
 				--update-only Update only
+				--jobs <n>    The number of parallel jobs to be used for fetching
 				-h, --help    show this help message and exit
 			EOF
 			shift
 			exit ;;
 		--update-only)
 			update_only=true ; shift ;;
+		--jobs)
+			max_jobs=$2 ; shift 2 ;;
 		--version)
 			echo $VERSION ; shift ; exit ;;
 		--) shift ; break ;;
@@ -43,10 +46,15 @@ if [ -n "$2" ]; then
 	git_path=$2
 fi
 
+if [[ ! $max_jobs -gt 0 ]]; then
+        max_jobs=1
+fi
+
 gitweb_url=$1
 
 echo "Gitweb URL     : $gitweb_url"
 echo "Local GIT path : $git_path"
+echo "Max jobs       : $max_jobs"
 
 for gitweb_p_html_url in $(curl -s "$gitweb_url/?a=opml" | grep '^<outline type="rss" text="' | cut -d'"' -f10); do
 
@@ -73,6 +81,12 @@ for gitweb_p_html_url in $(curl -s "$gitweb_url/?a=opml" | grep '^<outline type=
 	 grep '^<tr class="metadata_url"><td>URL</td><td>' | \
 	 cut -d'>' -f5 | cut -d'<' -f1)
 
-	git --git-dir=$target_dir fetch $gitweb_p_url +refs/heads/*:refs/heads/* --prune
+	until [ $(jobs -r | wc -l) -lt $max_jobs ]; do
+		sleep 1
+	done
+
+	git --git-dir=$target_dir fetch $gitweb_p_url +refs/heads/*:refs/heads/* --prune &
 	echo $gitweb_p_desc > description
 done
+
+wait
