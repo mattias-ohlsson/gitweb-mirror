@@ -1,0 +1,11 @@
+    gitweb-mirror - Gitweb-mirror
+
+https://github.com/mattias-ohlsson/gitweb-mirror
+
+INSTALL
+
+    make install
+
+UNINSTALL
+
+    rm /usr/bin/gitweb-mirror
