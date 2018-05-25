@@ -1,5 +1,5 @@
 NAME = gitweb-mirror
-VERSION = 1
+VERSION = 1.1
 
 default:
 
